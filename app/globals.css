@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 215 25% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 16%;
+    --primary: 187 77% 28%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 32 80% 53%;
+    --secondary-foreground: 24 24% 12%;
+    --muted: 210 24% 93%;
+    --muted-foreground: 215 15% 40%;
+    --accent: 151 45% 42%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 20% 84%;
+    --input: 210 20% 84%;
+    --ring: 187 77% 28%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}

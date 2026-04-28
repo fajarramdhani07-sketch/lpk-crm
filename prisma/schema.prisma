@@ -1,0 +1,347 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CANDIDATE
+  ADMIN
+  SUPERADMIN
+}
+
+enum Gender {
+  LAKI_LAKI
+  PEREMPUAN
+}
+
+enum ProfileStatus {
+  DRAFT
+  INCOMPLETE
+  COMPLETE
+  ARCHIVED
+}
+
+enum CvStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+  STALE
+}
+
+enum FileType {
+  PHOTO
+  DOCUMENT
+  VIDEO
+  CV
+}
+
+enum CvLanguage {
+  ID
+  JA
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          UserRole  @default(CANDIDATE)
+  candidateId   Int?      @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  candidate Candidate? @relation(fields: [candidateId], references: [id])
+  sessions  Session[]
+  accounts  Account[]
+  auditLogs AuditLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model Candidate {
+  id        Int     @id @default(autoincrement())
+  email     String  @unique
+  phoneNumber String
+
+  submittedAt       DateTime?
+  fullNameRomaji    String
+  fullNameKatakana  String?
+  nickname          String?
+  profilePhoto      String?
+  birthDate         DateTime
+  birthPlace        String?
+  gender            Gender
+  age               Int?
+
+  addressStreet     String
+  addressVillage    String?
+  addressCity       String
+  addressProvince   String?
+  addressPostalCode String?
+  addressCountry    String @default("Indonesia")
+
+  heightCm           Int
+  weightKg           Int
+  bloodType          String?
+  maritalStatus      String?
+  religion           String?
+  passportStatus     String?
+  medicalHistory     String?
+  wearsGlasses       Boolean?
+  medicalCheckupFile String?
+
+  education                 String
+  elementarySchool          Boolean @default(true)
+  elementarySchoolName      String?
+  elementaryStartDate       DateTime?
+  elementaryEndDate         DateTime?
+  juniorHighSchool          Boolean @default(true)
+  juniorHighSchoolName      String?
+  juniorHighStartDate       DateTime?
+  juniorHighEndDate         DateTime?
+  seniorHighSchool          Boolean @default(true)
+  seniorHighSchoolName      String?
+  seniorHighStartDate       DateTime?
+  seniorHighEndDate         DateTime?
+  seniorHighType            String?
+  seniorHighTypeOther       String?
+  seniorHighMajor           String?
+  seniorHighMajorOther      String?
+  university                Boolean @default(false)
+  universityName            String?
+  universityStartDate       DateTime?
+  universityEndDate         DateTime?
+  degreeLevel               String?
+  degreeLevelOther          String?
+  universityMajor           String?
+  universityMajorOther      String?
+
+  workExperience      String?
+  hasWorkExperience   Boolean @default(false)
+  latestJob           String?
+  companyNameLatest   String?
+  job1StartDate       DateTime?
+  job1EndDate         DateTime?
+  job1Role            String?
+  job1RoleOther       String?
+  previousJob1        String?
+  companyName1        String?
+  job2StartDate       DateTime?
+  job2EndDate         DateTime?
+  job2Role            String?
+  job2RoleOther       String?
+  previousJob2        String?
+  companyName2        String?
+  job3StartDate       DateTime?
+  job3EndDate         DateTime?
+  job3Role            String?
+  job3RoleOther       String?
+
+  familyInformation String?
+  family1Name       String?
+  family1BirthDate  DateTime?
+  family1Age        Int?
+  family1Relation   String?
+  family1RelationOther String?
+  family1Occupation String?
+  family1OccupationOther String?
+  family2Name       String?
+  family2BirthDate  DateTime?
+  family2Age        Int?
+  family2Relation   String?
+  family2RelationOther String?
+  family2Occupation String?
+  family2OccupationOther String?
+  family3Name       String?
+  family3BirthDate  DateTime?
+  family3Age        Int?
+  family3Relation   String?
+  family3RelationOther String?
+  family3Occupation String?
+  family3OccupationOther String?
+  family4Name       String?
+  family4BirthDate  DateTime?
+  family4Age        Int?
+  family4Relation   String?
+  family4RelationOther String?
+  family4Occupation String?
+  family4OccupationOther String?
+  family5Name       String?
+  family5BirthDate  DateTime?
+  family5Age        Int?
+  family5Relation   String?
+  family5RelationOther String?
+  family5Occupation String?
+  family5OccupationOther String?
+  family6Name       String?
+  family6BirthDate  DateTime?
+  family6Age        Int?
+  family6Relation   String?
+  family6RelationOther String?
+  family6Occupation String?
+  family6OccupationOther String?
+
+  lifestyle          String?
+  drinksAlcohol      Boolean?
+  smokes             Boolean?
+  hasTattoo          Boolean?
+  lpkInformation     String?
+  lpkOrigin          String?
+  lpkOriginOther     String?
+  japaneseStudyHours Int?
+
+  documentKtp            String?
+  documentKk             String?
+  documentIjazah         String?
+  documentPaspor         String?
+  documentMedicalCheckup String?
+  documentFotoProfil     String?
+  physicalTestVideo      String?
+  additionalFiles        String[]
+
+  skills          String[]
+  habits          String[]
+  profileStatus   ProfileStatus @default(DRAFT)
+  cvStatus        CvStatus      @default(PENDING)
+  completeness    Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  users       User[]
+  testResults TestResult[]
+  cvJobs      CvJob[]
+  files       CandidateFile[]
+
+  @@index([heightCm, weightKg, birthDate])
+  @@index([profileStatus])
+  @@index([cvStatus])
+  @@index([deletedAt])
+}
+
+model TestResult {
+  id            Int      @id @default(autoincrement())
+  candidateId   Int
+  totalScore    Int
+  attemptNumber Int
+  isLatest      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+
+  @@index([candidateId])
+  @@index([totalScore])
+  @@index([isLatest])
+}
+
+model CvJob {
+  id             Int        @id @default(autoincrement())
+  candidateId    Int
+  status         CvStatus   @default(PENDING)
+  retryCount     Int        @default(0)
+  outputLanguage CvLanguage
+  fileUrl        String?
+  storageKey     String?
+  errorMessage   String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  candidate Candidate       @relation(fields: [candidateId], references: [id])
+  files     CandidateFile[]
+
+  @@index([candidateId])
+  @@index([status])
+}
+
+model CandidateFile {
+  id          Int      @id @default(autoincrement())
+  candidateId Int
+  type        FileType
+  name        String
+  url         String
+  storageKey  String?
+  mimeType    String?
+  sizeBytes   Int?
+  cvJobId     Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+  cvJob     CvJob?    @relation(fields: [cvJobId], references: [id])
+
+  @@index([candidateId])
+  @@index([type])
+  @@index([deletedAt])
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     String?
+  action     String
+  entityType String
+  entityId   Int?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
