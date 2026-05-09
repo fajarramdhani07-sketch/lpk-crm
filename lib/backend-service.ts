@@ -34,6 +34,7 @@ export type BackendCandidate = Record<string, unknown> & {
   updatedAt: string;
   testResults?: BackendTestResult[];
   files?: BackendCandidateFile[];
+  cvJobs?: BackendCvJob[];
 };
 
 export type BackendTestResult = Record<string, unknown> & {
@@ -150,6 +151,16 @@ export const backendService = {
   async updateCandidate(id: number, data: Record<string, unknown>) {
     const response = await apiFetch<BackendCandidate>(`/api/candidates/${id}`, {
       method: "PATCH",
+      body: JSON.stringify(data)
+    });
+    return {
+      data: mapCandidate(response.data),
+      raw: response.data
+    };
+  },
+  async createCandidate(data: Record<string, unknown>) {
+    const response = await apiFetch<BackendCandidate>("/api/candidates", {
+      method: "POST",
       body: JSON.stringify(data)
     });
     return {

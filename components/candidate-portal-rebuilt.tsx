@@ -171,7 +171,8 @@ export function CandidatePortalRebuilt({
   onRefresh,
   onCancel,
   onSaved,
-  variant = "page"
+  variant = "page",
+  createMode = false
 }: {
   candidateId: number;
   candidate?: Candidate;
@@ -182,6 +183,7 @@ export function CandidatePortalRebuilt({
   onCancel?: () => void;
   onSaved?: () => void;
   variant?: "page" | "embedded";
+  createMode?: boolean;
 }) {
   const storeCandidates = useCrmStore((state) => state.candidates);
   const storeFiles = useCrmStore((state) => state.files);
@@ -193,6 +195,7 @@ export function CandidatePortalRebuilt({
   const candidateFiles = files.filter((file) => file.candidateId === candidate.id && file.type === "cv");
   const [errors, setErrors] = useState<FormErrors>({});
   const [message, setMessage] = useState("");
+  const [activeSection, setActiveSection] = useState<SectionKey>("identity");
   const form = useForm<CandidateFormValues>({
     defaultValues: toStructuredFormValues(candidate)
   });
@@ -230,7 +233,13 @@ export function CandidatePortalRebuilt({
 
     form.reset(nextValues);
     if (useBackend) {
-      await backendService.updateCandidate(candidate.id, mapToBackendCandidatePayload(nextValues, profileStatus));
+      const basePayload = mapToBackendCandidatePayload(nextValues, profileStatus);
+      const payload = createMode ? withCreateFallbacks(basePayload, candidate) : basePayload;
+      if (createMode) {
+        await backendService.createCandidate(payload);
+      } else {
+        await backendService.updateCandidate(candidate.id, payload);
+      }
       await onRefresh?.();
     } else {
       const updated = await mockService.updateCandidate(candidate, mapToCandidatePatch(candidate, nextValues, profileStatus));
@@ -250,6 +259,50 @@ export function CandidatePortalRebuilt({
   }
 
   const isEmbedded = variant === "embedded";
+  const sections: SectionConfig[] = [
+    {
+      key: "identity",
+      title: "Identitas",
+      stats: sectionStats.identity,
+      content: <IdentitySection register={form.register} setValue={form.setValue} watch={form.watch} errors={errors} candidates={candidates} candidate={candidate} />
+    },
+    {
+      key: "personal",
+      title: "Data Pribadi",
+      stats: sectionStats.personal,
+      content: <PersonalSection register={form.register} setValue={form.setValue} watch={form.watch} errors={errors} />
+    },
+    {
+      key: "education",
+      title: "Pendidikan",
+      stats: sectionStats.education,
+      content: <EducationSection register={form.register} watch={form.watch} errors={errors} />
+    },
+    {
+      key: "work",
+      title: "Pengalaman Kerja",
+      stats: sectionStats.work,
+      content: <WorkSection register={form.register} watch={form.watch} errors={errors} />
+    },
+    {
+      key: "family",
+      title: "Keluarga",
+      stats: sectionStats.family,
+      content: <FamilySection register={form.register} watch={form.watch} errors={errors} />
+    },
+    {
+      key: "lpk",
+      title: "Lifestyle & LPK",
+      stats: sectionStats.lpk,
+      content: <LifestyleLpkSection register={form.register} watch={form.watch} errors={errors} />
+    },
+    {
+      key: "documents",
+      title: "Dokumen",
+      stats: sectionStats.documents,
+      content: <DocumentsSection setValue={form.setValue} watch={form.watch} errors={errors} />
+    }
+  ];
 
   return (
     <div className={cn(isEmbedded ? "grid gap-4" : "mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-6")}>
@@ -269,27 +322,21 @@ export function CandidatePortalRebuilt({
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
-            <AccordionSection title="Identitas" stats={sectionStats.identity} defaultOpen>
-              <IdentitySection register={form.register} setValue={form.setValue} watch={form.watch} errors={errors} candidates={candidates} candidate={candidate} />
-            </AccordionSection>
-            <AccordionSection title="Data Pribadi" stats={sectionStats.personal}>
-              <PersonalSection register={form.register} setValue={form.setValue} watch={form.watch} errors={errors} />
-            </AccordionSection>
-            <AccordionSection title="Pendidikan" stats={sectionStats.education}>
-              <EducationSection register={form.register} watch={form.watch} errors={errors} />
-            </AccordionSection>
-            <AccordionSection title="Pengalaman Kerja" stats={sectionStats.work}>
-              <WorkSection register={form.register} watch={form.watch} errors={errors} />
-            </AccordionSection>
-            <AccordionSection title="Keluarga" stats={sectionStats.family}>
-              <FamilySection register={form.register} watch={form.watch} errors={errors} />
-            </AccordionSection>
-            <AccordionSection title="Lifestyle & LPK" stats={sectionStats.lpk}>
-              <LifestyleLpkSection register={form.register} watch={form.watch} errors={errors} />
-            </AccordionSection>
-            <AccordionSection title="Dokumen" stats={sectionStats.documents}>
-              <DocumentsSection setValue={form.setValue} watch={form.watch} errors={errors} />
-            </AccordionSection>
+            {isEmbedded ? (
+              <>
+                {sections.map((section, index) => (
+                  <AccordionSection key={section.key} title={section.title} stats={section.stats} defaultOpen={index === 0}>
+                    {section.content}
+                  </AccordionSection>
+                ))}
+              </>
+            ) : (
+              <CandidateSectionTabs
+                activeSection={activeSection}
+                sections={sections}
+                setActiveSection={setActiveSection}
+              />
+            )}
 
             {message ? (
               <div className={cn("rounded-md border px-3 py-2 text-sm", Object.keys(errors).length ? "border-destructive text-destructive" : "border-emerald-200 bg-emerald-50 text-emerald-800")}>
@@ -297,19 +344,15 @@ export function CandidatePortalRebuilt({
               </div>
             ) : null}
 
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => void save("draft")}>
-                Simpan Draft
-              </Button>
-              <Button type="button" onClick={() => void save("complete")}>
-                <CheckCircle2 className="h-4 w-4" /> Submit Final
-              </Button>
-              {onCancel ? (
-                <Button type="button" variant="ghost" onClick={onCancel}>
-                  Batal
-                </Button>
-              ) : null}
-            </div>
+            <CandidateFormActions
+              activeSection={activeSection}
+              isEmbedded={isEmbedded}
+              onCancel={onCancel}
+              onPrevious={() => setActiveSection(previousSection(activeSection))}
+              onNext={() => setActiveSection(nextSection(activeSection))}
+              onSaveDraft={() => void save("draft")}
+              onSubmitFinal={() => void save("complete")}
+            />
           </form>
         </CardContent>
       </Card>
@@ -356,6 +399,152 @@ export function CandidatePortalRebuilt({
       ) : null}
     </div>
   );
+}
+
+function CandidateFormActions({
+  activeSection,
+  isEmbedded,
+  onCancel,
+  onPrevious,
+  onNext,
+  onSaveDraft,
+  onSubmitFinal
+}: {
+  activeSection: SectionKey;
+  isEmbedded: boolean;
+  onCancel?: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSaveDraft: () => void;
+  onSubmitFinal: () => void;
+}) {
+  const currentIndex = sectionOrder.indexOf(activeSection);
+  const isFirst = currentIndex === 0;
+  const isLast = currentIndex === sectionOrder.length - 1;
+
+  return (
+    <div className="sticky bottom-0 z-10 -mx-5 flex flex-col gap-3 border-t bg-card/95 px-5 py-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+      {!isEmbedded ? (
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" disabled={isFirst} onClick={onPrevious}>
+            Sebelumnya
+          </Button>
+          <Button type="button" variant={isLast ? "secondary" : "outline"} disabled={isLast} onClick={onNext}>
+            Selanjutnya
+          </Button>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap gap-2 sm:justify-end">
+        <Button type="button" variant="outline" onClick={onSaveDraft}>
+          Simpan Draft
+        </Button>
+        <Button type="button" onClick={onSubmitFinal}>
+          <CheckCircle2 className="h-4 w-4" /> Submit Final
+        </Button>
+        {onCancel ? (
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Batal
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CandidateSectionTabs({
+  activeSection,
+  sections,
+  setActiveSection
+}: {
+  activeSection: SectionKey;
+  sections: SectionConfig[];
+  setActiveSection: (section: SectionKey) => void;
+}) {
+  const active = sections.find((section) => section.key === activeSection) ?? sections[0];
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)]">
+      <nav className="lg:sticky lg:top-20 lg:self-start">
+        <div className="hidden space-y-2 lg:block">
+          {sections.map((section, index) => (
+            <SectionTabButton
+              key={section.key}
+              section={section}
+              index={index}
+              active={section.key === activeSection}
+              onClick={() => setActiveSection(section.key)}
+            />
+          ))}
+        </div>
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 lg:hidden">
+          {sections.map((section, index) => (
+            <SectionTabButton
+              key={section.key}
+              section={section}
+              index={index}
+              active={section.key === activeSection}
+              onClick={() => setActiveSection(section.key)}
+              compact
+            />
+          ))}
+        </div>
+      </nav>
+      <section className="min-w-0 rounded-md border bg-card">
+        <div className="border-b bg-muted/40 px-4 py-3">
+          <h2 className="text-sm font-semibold">{active.title}</h2>
+          <p className="text-xs text-muted-foreground">{active.stats.complete} dari {active.stats.total} item terisi</p>
+        </div>
+        <div className="p-4">{active.content}</div>
+      </section>
+    </div>
+  );
+}
+
+function SectionTabButton({
+  section,
+  index,
+  active,
+  onClick,
+  compact = false
+}: {
+  section: SectionConfig;
+  index: number;
+  active: boolean;
+  onClick: () => void;
+  compact?: boolean;
+}) {
+  const percentage = section.stats.total ? Math.round((section.stats.complete / section.stats.total) * 100) : 0;
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "rounded-md border text-left transition-colors",
+        active ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted",
+        compact ? "min-w-40 px-3 py-2" : "w-full px-3 py-3"
+      )}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-medium opacity-75">{String(index + 1).padStart(2, "0")}</span>
+        <Badge variant={active ? "secondary" : percentage === 100 ? "success" : "warning"}>{section.stats.complete}/{section.stats.total}</Badge>
+      </div>
+      <div className="mt-2 text-sm font-semibold">{section.title}</div>
+      <div className={cn("mt-2 h-1.5 overflow-hidden rounded-full", active ? "bg-primary-foreground/25" : "bg-muted")}>
+        <div className={cn("h-full rounded-full", active ? "bg-primary-foreground" : "bg-accent")} style={{ width: `${percentage}%` }} />
+      </div>
+    </button>
+  );
+}
+
+function previousSection(section: SectionKey) {
+  const currentIndex = sectionOrder.indexOf(section);
+  return sectionOrder[Math.max(0, currentIndex - 1)];
+}
+
+function nextSection(section: SectionKey) {
+  const currentIndex = sectionOrder.indexOf(section);
+  return sectionOrder[Math.min(sectionOrder.length - 1, currentIndex + 1)];
 }
 
 function IdentitySection({
@@ -546,6 +735,16 @@ type SectionProps = {
   setValue: UseFormSetValue<CandidateFormValues>;
   watch: UseFormWatch<CandidateFormValues>;
   errors: FormErrors;
+};
+
+const sectionOrder = ["identity", "personal", "education", "work", "family", "lpk", "documents"] as const;
+type SectionKey = (typeof sectionOrder)[number];
+
+type SectionConfig = {
+  key: SectionKey;
+  title: string;
+  stats: { complete: number; total: number };
+  content: React.ReactNode;
 };
 
 function AccordionSection({
@@ -1209,6 +1408,28 @@ function mapToBackendCandidatePayload(values: CandidateFormValues, profileStatus
     cvStatus: "stale",
     ...familyPayload(values.family.members),
     additionalFields: flat
+  };
+}
+
+function withCreateFallbacks(payload: Record<string, unknown>, candidate: Candidate) {
+  const stamp = Date.now();
+  const email = String(payload.email ?? "").trim();
+  const fullName = String(payload.fullNameRomaji ?? "").trim();
+  const phone = String(payload.phoneNumber ?? "").trim();
+  return {
+    ...payload,
+    email: email || `candidate-${stamp}@draft.local`,
+    phoneNumber: phone || `08${String(stamp).slice(-10)}`,
+    fullNameRomaji: fullName || `KANDIDAT BARU ${String(stamp).slice(-4)}`,
+    birthDate: payload.birthDate || candidate.birthDate || "2000-01-01",
+    gender: payload.gender || candidate.gender || "Laki-laki",
+    addressStreet: payload.addressStreet || candidate.address || "-",
+    addressCity: payload.addressCity || candidate.city || "-",
+    heightCm: payload.heightCm || candidate.height || 160,
+    weightKg: payload.weightKg || candidate.weight || 55,
+    education: payload.education || candidate.education || "-",
+    profileStatus: payload.profileStatus || "draft",
+    cvStatus: "pending"
   };
 }
 

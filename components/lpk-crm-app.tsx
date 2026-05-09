@@ -19,13 +19,14 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AdminWorkspace } from "@/components/admin/admin-workspace";
 import { CandidatePortalRebuilt } from "@/components/candidate-portal-rebuilt";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { backendService, mapRole, type BackendSession } from "@/lib/backend-service";
-import type { AuditLog, Candidate, CandidateFile, CandidateFilters, CvStatus, ProfileStatus, TestResult, UserRole } from "@/lib/types";
+import { backendService, mapCvJob, mapRole, type BackendSession } from "@/lib/backend-service";
+import type { AuditLog, Candidate, CandidateFile, CandidateFilters, CvJob, CvStatus, ProfileStatus, TestResult, UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const initialFilters: CandidateFilters = {
@@ -69,6 +70,7 @@ export function LpkCrmApp() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [files, setFiles] = useState<CandidateFile[]>([]);
+  const [cvJobs, setCvJobs] = useState<CvJob[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -98,9 +100,11 @@ export function LpkCrmApp() {
       createdAt: file.createdAt,
       updatedAt: file.updatedAt
     })));
+    const nextCvJobs = candidateResponse.raw.flatMap((candidate) => (candidate.cvJobs ?? []).map(mapCvJob));
     setCandidates(nextCandidates);
     setTestResults(nextTests);
     setFiles(nextFiles);
+    setCvJobs(nextCvJobs);
     if (mapRole(activeSession.user.role) !== "candidate") {
       const logs = await backendService.listAuditLogs();
       setAuditLogs(logs.data);
@@ -154,6 +158,7 @@ export function LpkCrmApp() {
     setCandidates([]);
     setTestResults([]);
     setFiles([]);
+    setCvJobs([]);
     setAuditLogs([]);
   }
 
@@ -167,25 +172,31 @@ export function LpkCrmApp() {
 
   return (
     <main className="min-h-screen bg-background">
-      <TopBar role={role} userName={session.user.name} onLogout={handleLogout} loading={loading} />
       {error ? <BackendBanner message={error} /> : null}
       {role === "candidate" ? (
-        <CandidatePortalRebuilt
-          candidateId={candidateId}
-          candidate={candidates.find((candidate) => candidate.id === candidateId)}
-          candidates={candidates}
-          files={files}
-          onRefresh={() => refreshBackendData(session)}
-          useBackend
-        />
+        <>
+          <TopBar role={role} userName={session.user.name} onLogout={handleLogout} loading={loading} />
+          <CandidatePortalRebuilt
+            candidateId={candidateId}
+            candidate={candidates.find((candidate) => candidate.id === candidateId)}
+            candidates={candidates}
+            files={files}
+            onRefresh={() => refreshBackendData(session)}
+            useBackend
+          />
+        </>
       ) : (
-        <AdminCrm
+        <AdminWorkspace
           role={role}
+          userName={session.user.name}
+          loading={loading}
           candidates={candidates}
           testResults={testResults}
           files={files}
+          cvJobs={cvJobs}
           auditLogs={auditLogs}
           onRefresh={() => refreshBackendData(session)}
+          onLogout={handleLogout}
         />
       )}
     </main>
