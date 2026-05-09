@@ -38,4 +38,18 @@
   .stat-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
+
+  .cv-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border: 1px solid #171717;
+  }
+
+  .cv-table th,
+  .cv-table td {
+    border: 1px solid #171717;
+    height: 24px;
+    overflow-wrap: anywhere;
+  }
 }

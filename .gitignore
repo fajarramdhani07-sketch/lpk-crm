@@ -43,6 +43,7 @@ prisma/dev.db-journal
 .tmp/
 tmp/
 temp/
+.generated/
 
 # OS/editor files
 .DS_Store
