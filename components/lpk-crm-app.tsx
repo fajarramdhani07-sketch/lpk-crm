@@ -1,6 +1,5 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Activity,
   ClipboardCheck,
@@ -18,8 +17,6 @@ import {
   Users
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm, type UseFormRegister } from "react-hook-form";
-import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CandidatePortalRebuilt } from "@/components/candidate-portal-rebuilt";
@@ -27,33 +24,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { backendService, mapRole, type BackendSession } from "@/lib/backend-service";
-import { mockService } from "@/lib/mock-service";
-import { useCrmStore } from "@/lib/store";
-import type { AuditLog, Candidate, CandidateFile, CandidateFilters, CvJob, CvStatus, ProfileStatus, TestResult, UserRole } from "@/lib/types";
+import type { AuditLog, Candidate, CandidateFile, CandidateFilters, CvStatus, ProfileStatus, TestResult, UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const candidateSchema = z.object({
-  name: z.string().min(3, "Nama wajib diisi"),
-  birthDate: z.string().min(1, "Tanggal lahir wajib diisi"),
-  gender: z.enum(["Laki-laki", "Perempuan"]),
-  height: z.preprocess((value) => Number(value), z.number().min(120).max(220)),
-  weight: z.preprocess((value) => Number(value), z.number().min(35).max(140)),
-  address: z.string().min(8, "Alamat wajib lengkap"),
-  city: z.string().min(2, "Kota wajib diisi"),
-  education: z.string().min(3, "Pendidikan wajib diisi"),
-  experience: z.string().min(3, "Pengalaman wajib diisi"),
-  family: z.string().min(3, "Data keluarga wajib diisi"),
-  habitsText: z.string(),
-  skillsText: z.string(),
-  medicalHistory: z.string().min(2, "Riwayat medis wajib diisi"),
-  phone: z.string().min(8, "Nomor telepon wajib diisi"),
-  email: z.string().email("Email tidak valid"),
-  additionalFields: z.record(z.string(), z.string())
-});
-
-type CandidateFormValues = z.infer<typeof candidateSchema>;
 
 const initialFilters: CandidateFilters = {
   query: "",
@@ -89,112 +62,6 @@ const requiredChecklist: Array<{ key: keyof Candidate; label: string }> = [
   { key: "habits", label: "Kebiasaan" },
   { key: "skills", label: "Skill dan tes" },
   { key: "medicalHistory", label: "Riwayat medis" }
-];
-
-type AdditionalFieldConfig = {
-  name: string;
-  label: string;
-  type?: "text" | "date" | "number" | "select";
-  options?: string[];
-};
-
-const yesNoOptions = ["Ya", "Tidak"];
-
-const additionalFieldSections: Array<{ title: string; fields: AdditionalFieldConfig[] }> = [
-  {
-    title: "Pengiriman dan Identitas Tambahan",
-    fields: [
-      { name: "submitted_at", label: "Tanggal submit", type: "date" },
-      { name: "full_name_romaji", label: "Nama lengkap romaji" },
-      { name: "full_name_katakana", label: "Nama lengkap katakana" },
-      { name: "nickname", label: "Nama panggilan" },
-      { name: "profile_photo", label: "Foto profil" },
-      { name: "birth_place", label: "Tempat lahir" },
-      { name: "age", label: "Usia", type: "number" }
-    ]
-  },
-  {
-    title: "Data Pribadi Tambahan",
-    fields: [
-      { name: "blood_type", label: "Golongan darah", type: "select", options: ["A", "B", "AB", "O", "Tidak tahu"] },
-      { name: "marital_status", label: "Status pernikahan", type: "select", options: ["Belum menikah", "Menikah", "Cerai"] },
-      { name: "religion", label: "Agama" },
-      { name: "passport_status", label: "Status paspor", type: "select", options: ["Belum ada", "Dalam proses", "Sudah ada"] },
-      { name: "wears_glasses", label: "Memakai kacamata", type: "select", options: yesNoOptions },
-      { name: "medical_checkup_file", label: "File medical checkup" }
-    ]
-  },
-  {
-    title: "Detail Pendidikan",
-    fields: [
-      { name: "elementary_school", label: "SD", type: "select", options: yesNoOptions },
-      { name: "elementary_school_name", label: "Nama SD" },
-      { name: "elementary_start_date", label: "Mulai SD", type: "date" },
-      { name: "elementary_end_date", label: "Selesai SD", type: "date" },
-      { name: "junior_high_school", label: "SMP", type: "select", options: yesNoOptions },
-      { name: "junior_high_school_name", label: "Nama SMP" },
-      { name: "junior_high_start_date", label: "Mulai SMP", type: "date" },
-      { name: "junior_high_end_date", label: "Selesai SMP", type: "date" },
-      { name: "senior_high_school", label: "SMA/SMK", type: "select", options: yesNoOptions },
-      { name: "senior_high_school_name", label: "Nama SMA/SMK" },
-      { name: "senior_high_start_date", label: "Mulai SMA/SMK", type: "date" },
-      { name: "senior_high_end_date", label: "Selesai SMA/SMK", type: "date" },
-      { name: "senior_high_type", label: "Jenis sekolah menengah", type: "select", options: ["SMA", "SMK", "MA", "Lainnya"] },
-      { name: "senior_high_major", label: "Jurusan SMA/SMK" },
-      { name: "university", label: "Kuliah", type: "select", options: yesNoOptions },
-      { name: "university_name", label: "Nama universitas" },
-      { name: "university_start_date", label: "Mulai universitas", type: "date" },
-      { name: "university_end_date", label: "Selesai universitas", type: "date" },
-      { name: "degree_level", label: "Jenjang gelar", type: "select", options: ["D1", "D2", "D3", "D4", "S1", "S2", "S3", "Lainnya"] },
-      { name: "university_major", label: "Jurusan universitas" }
-    ]
-  },
-  {
-    title: "Detail Pengalaman Kerja",
-    fields: [
-      { name: "latest_job", label: "Pekerjaan terakhir" },
-      { name: "company_name_latest", label: "Nama perusahaan terakhir" },
-      { name: "job1_start_date", label: "Mulai kerja terakhir", type: "date" },
-      { name: "job1_end_date", label: "Selesai kerja terakhir", type: "date" },
-      { name: "job1_role", label: "Posisi kerja terakhir" },
-      { name: "previous_job_1", label: "Pekerjaan sebelumnya 1" },
-      { name: "company_name_1", label: "Nama perusahaan 1" },
-      { name: "job2_start_date", label: "Mulai kerja 1", type: "date" },
-      { name: "job2_end_date", label: "Selesai kerja 1", type: "date" },
-      { name: "job2_role", label: "Posisi kerja 1" },
-      { name: "previous_job_2", label: "Pekerjaan sebelumnya 2" },
-      { name: "company_name_2", label: "Nama perusahaan 2" },
-      { name: "job3_start_date", label: "Mulai kerja 2", type: "date" },
-      { name: "job3_end_date", label: "Selesai kerja 2", type: "date" },
-      { name: "job3_role", label: "Posisi kerja 2" }
-    ]
-  },
-  {
-    title: "Detail Keluarga",
-    fields: Array.from({ length: 6 }, (_, index) => {
-      const number = index + 1;
-      return [
-        { name: `family${number}_name`, label: `Nama keluarga ${number}` },
-        { name: `family${number}_birth_date`, label: `Tanggal lahir keluarga ${number}`, type: "date" as const },
-        { name: `family${number}_age`, label: `Usia keluarga ${number}`, type: "number" as const },
-        { name: `family${number}_relation`, label: `Hubungan keluarga ${number}` },
-        { name: `family${number}_occupation`, label: `Pekerjaan keluarga ${number}` }
-      ];
-    }).flat()
-  },
-  {
-    title: "Lifestyle, LPK, dan Dokumen",
-    fields: [
-      { name: "drinks_alcohol", label: "Minum alkohol", type: "select", options: yesNoOptions },
-      { name: "smokes", label: "Merokok", type: "select", options: yesNoOptions },
-      { name: "has_tattoo", label: "Memiliki tato", type: "select", options: yesNoOptions },
-      { name: "lpk_origin", label: "Asal LPK" },
-      { name: "japanese_study_hours", label: "Jam belajar bahasa Jepang", type: "number" },
-      { name: "documents", label: "Dokumen utama" },
-      { name: "physical_test_video", label: "Video tes fisik" },
-      { name: "additional_files", label: "File tambahan" }
-    ]
-  }
 ];
 
 export function LpkCrmApp() {
@@ -430,6 +297,7 @@ function AdminCrm({
 }) {
   const [filters, setFilters] = useState<CandidateFilters>(initialFilters);
   const [selectedId, setSelectedId] = useState(candidates[0]?.id ?? 0);
+  const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
 
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedId) ?? candidates[0];
   const candidateScores = useMemo(() => latestScores(testResults), [testResults]);
@@ -442,8 +310,14 @@ function AdminCrm({
   useEffect(() => {
     if (!filteredCandidates.some((candidate) => candidate.id === selectedId)) {
       setSelectedId(filteredCandidates[0]?.id ?? candidates[0]?.id ?? 0);
+      setDetailMode("view");
     }
   }, [candidates, filteredCandidates, selectedId]);
+
+  function selectCandidate(id: number) {
+    setSelectedId(id);
+    setDetailMode("view");
+  }
 
   async function handleAddFile(type: "photo" | "document" | "video" | "cv") {
     if (!selectedCandidate) return;
@@ -507,7 +381,7 @@ function AdminCrm({
                   {filteredCandidates.map((candidate) => (
                     <tr key={candidate.id} className={cn("border-t", selectedCandidate?.id === candidate.id && "bg-muted/50")}>
                       <td className="px-3 py-3">
-                        <button className="text-left font-medium hover:text-primary" onClick={() => setSelectedId(candidate.id)}>
+                        <button className="text-left font-medium hover:text-primary" onClick={() => selectCandidate(candidate.id)}>
                           {candidate.name}
                         </button>
                         <div className="text-xs text-muted-foreground">{candidate.city} - {candidate.height} cm / {candidate.weight} kg</div>
@@ -523,7 +397,7 @@ function AdminCrm({
                       <td className="px-3 py-3"><CvBadge status={candidate.cvStatus} /></td>
                       <td className="px-3 py-3">{candidate.education}</td>
                       <td className="px-3 py-3">
-                        <Button size="sm" variant="outline" onClick={() => setSelectedId(candidate.id)}>
+                        <Button size="sm" variant="outline" onClick={() => selectCandidate(candidate.id)}>
                           Detail
                         </Button>
                       </td>
@@ -535,10 +409,23 @@ function AdminCrm({
           </CardContent>
         </Card>
 
-        {selectedCandidate ? (
+        {selectedCandidate && detailMode === "edit" ? (
+          <CandidatePortalRebuilt
+            candidateId={selectedCandidate.id}
+            candidate={selectedCandidate}
+            candidates={candidates}
+            files={files.filter((file) => file.candidateId === selectedCandidate.id)}
+            onCancel={() => setDetailMode("view")}
+            onRefresh={onRefresh}
+            onSaved={() => setDetailMode("view")}
+            useBackend
+            variant="embedded"
+          />
+        ) : selectedCandidate ? (
           <CandidateDetail
             candidate={selectedCandidate}
             isSuperadmin={role === "superadmin"}
+            onEdit={() => setDetailMode("edit")}
             onTriggerCv={handleTriggerCv}
             onCompleteCv={handleCompleteCv}
             onAddFile={handleAddFile}
@@ -565,8 +452,8 @@ function CandidateFiltersPanel({
   const habits = unique(candidates.flatMap((candidate) => candidate.habits));
 
   return (
-    <div className="grid gap-3 md:grid-cols-[minmax(220px,1.5fr)_repeat(4,minmax(130px,1fr))]">
-      <label className="relative">
+    <div className="grid gap-3">
+      <label className="relative min-w-0">
         <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
         <Input
           value={filters.query}
@@ -575,24 +462,24 @@ function CandidateFiltersPanel({
           placeholder="Cari nama, kota, skill..."
         />
       </label>
-      <select className="h-10 rounded-md border bg-background px-3 text-sm" value={filters.profileStatus} onChange={(event) => setFilters({ ...filters, profileStatus: event.target.value as CandidateFilters["profileStatus"] })}>
-        <option value="all">Semua profil</option>
-        {Object.entries(profileLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-      </select>
-      <select className="h-10 rounded-md border bg-background px-3 text-sm" value={filters.cvStatus} onChange={(event) => setFilters({ ...filters, cvStatus: event.target.value as CandidateFilters["cvStatus"] })}>
-        <option value="all">Semua CV</option>
-        {Object.entries(cvLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-      </select>
-      <select className="h-10 rounded-md border bg-background px-3 text-sm" value={filters.education} onChange={(event) => setFilters({ ...filters, education: event.target.value })}>
-        <option value="all">Pendidikan</option>
-        {educations.map((education) => <option key={education} value={education}>{education}</option>)}
-      </select>
-      <div className="flex gap-2">
-        <select className="h-10 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm" value={filters.habit} onChange={(event) => setFilters({ ...filters, habit: event.target.value })}>
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+        <select className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" value={filters.profileStatus} onChange={(event) => setFilters({ ...filters, profileStatus: event.target.value as CandidateFilters["profileStatus"] })}>
+          <option value="all">Semua profil</option>
+          {Object.entries(profileLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <select className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" value={filters.cvStatus} onChange={(event) => setFilters({ ...filters, cvStatus: event.target.value as CandidateFilters["cvStatus"] })}>
+          <option value="all">Semua CV</option>
+          {Object.entries(cvLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <select className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" value={filters.education} onChange={(event) => setFilters({ ...filters, education: event.target.value })}>
+          <option value="all">Pendidikan</option>
+          {educations.map((education) => <option key={education} value={education}>{education}</option>)}
+        </select>
+        <select className="h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm" value={filters.habit} onChange={(event) => setFilters({ ...filters, habit: event.target.value })}>
           <option value="all">Kebiasaan</option>
           {habits.map((habit) => <option key={habit} value={habit}>{habit}</option>)}
         </select>
-        <Button size="icon" variant="outline" title="Reset filter" onClick={() => setFilters(initialFilters)}>
+        <Button className="h-10 w-10 justify-self-start sm:justify-self-end lg:justify-self-auto" size="icon" variant="outline" title="Reset filter" onClick={() => setFilters(initialFilters)}>
           <Filter className="h-4 w-4" />
         </Button>
       </div>
@@ -606,6 +493,7 @@ function CandidateDetail({
   tests,
   files,
   logs,
+  onEdit,
   onTriggerCv,
   onCompleteCv,
   onAddFile
@@ -615,6 +503,7 @@ function CandidateDetail({
   tests: TestResult[];
   files: CandidateFile[];
   logs: AuditLog[];
+  onEdit: () => void;
   onTriggerCv: () => void | Promise<void>;
   onCompleteCv: () => void | Promise<void>;
   onAddFile: (type: "photo" | "document" | "video" | "cv") => void | Promise<void>;
@@ -629,13 +518,19 @@ function CandidateDetail({
             </CardTitle>
             <CardDescription>{candidate.email} - {candidate.phone}</CardDescription>
           </div>
-          <CvBadge status={candidate.cvStatus} />
+          <div className="flex flex-col items-end gap-2">
+            <CvBadge status={candidate.cvStatus} />
+            <Button size="sm" onClick={onEdit}>
+              Edit Data
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="profile">
-          <TabsList className="grid h-auto w-full grid-cols-5">
+          <TabsList className="grid h-auto w-full grid-cols-3 sm:grid-cols-6">
             <TabsTrigger value="profile">Profil</TabsTrigger>
+            <TabsTrigger value="complete">Data Lengkap</TabsTrigger>
             <TabsTrigger value="tests">Tes</TabsTrigger>
             <TabsTrigger value="files">File</TabsTrigger>
             <TabsTrigger value="cv">CV</TabsTrigger>
@@ -643,8 +538,12 @@ function CandidateDetail({
           </TabsList>
           <TabsContent value="profile">
             <div className="grid gap-3 text-sm md:grid-cols-2">
+              <Info label="Kontak" value={`${candidate.email} - ${candidate.phone}`} />
               <Info label="Alamat" value={`${candidate.address}, ${candidate.city}`} />
               <Info label="Fisik" value={`${candidate.height} cm / ${candidate.weight} kg`} />
+              <Info label="Status profil" value={profileLabels[candidate.profileStatus]} />
+              <Info label="Status CV" value={cvLabels[candidate.cvStatus]} />
+              <Info label="Kelengkapan" value={`${candidate.completeness}%`} />
               <Info label="Pendidikan" value={candidate.education} />
               <Info label="Pengalaman" value={candidate.experience} />
               <Info label="Keluarga" value={candidate.family} />
@@ -654,6 +553,9 @@ function CandidateDetail({
               <Progress value={candidate.completeness} />
               <Checklist candidate={candidate} />
             </div>
+          </TabsContent>
+          <TabsContent value="complete">
+            <FullCandidateData candidate={candidate} />
           </TabsContent>
           <TabsContent value="tests">
             <div className="space-y-3">
@@ -734,157 +636,193 @@ function CandidateDetail({
   );
 }
 
-function CandidatePortal({ candidateId }: { candidateId: number }) {
-  const candidates = useCrmStore((state) => state.candidates);
-  const files = useCrmStore((state) => state.files);
-  const updateCandidate = useCrmStore((state) => state.updateCandidate);
-  const triggerCvGeneration = useCrmStore((state) => state.triggerCvGeneration);
-  const candidate = candidates.find((item) => item.id === candidateId) ?? candidates[0];
-  const candidateFiles = files.filter((file) => file.candidateId === candidate.id && file.type === "cv");
-  const form = useForm<CandidateFormValues>({
-    resolver: zodResolver(candidateSchema) as never,
-    defaultValues: toFormValues(candidate)
-  });
+type DetailField = {
+  label: string;
+  value: string | number | string[] | undefined;
+};
 
-  useEffect(() => {
-    form.reset(toFormValues(candidate));
-  }, [candidate, form]);
-
-  async function save(values: CandidateFormValues, profileStatus: ProfileStatus) {
-    const updated = await mockService.updateCandidate(candidate, fromFormValues(candidate, values, profileStatus));
-    updateCandidate(updated, profileStatus === "complete" ? "final_submit_candidate" : "save_draft_candidate");
-  }
+function FullCandidateData({ candidate }: { candidate: Candidate }) {
+  const extra = candidate.additionalFields ?? {};
+  const sections: Array<{ title: string; fields: DetailField[] }> = [
+    {
+      title: "Identitas",
+      fields: [
+        { label: "Nama lengkap romaji", value: extra.full_name_romaji || candidate.name },
+        { label: "Nama lengkap katakana", value: extra.full_name_katakana },
+        { label: "Nama panggilan", value: extra.nickname },
+        { label: "Email", value: candidate.email },
+        { label: "Nomor HP", value: candidate.phone },
+        { label: "Foto profil", value: extra.profile_photo },
+        { label: "Tanggal submit", value: extra.submitted_at },
+        { label: "Tanggal lahir", value: candidate.birthDate },
+        { label: "Tempat lahir", value: extra.birth_place },
+        { label: "Usia", value: extra.age },
+        { label: "Gender", value: candidate.gender },
+        { label: "Dibuat", value: formatDate(candidate.createdAt) },
+        { label: "Diupdate", value: formatDate(candidate.updatedAt) }
+      ]
+    },
+    {
+      title: "Alamat",
+      fields: [
+        { label: "Jalan / alamat", value: extra.address_street || candidate.address },
+        { label: "Kelurahan / kecamatan", value: extra.address_village },
+        { label: "Kota / kabupaten", value: extra.address_city || candidate.city },
+        { label: "Provinsi", value: extra.address_province },
+        { label: "Kode pos", value: extra.address_postal_code },
+        { label: "Negara", value: extra.address_country }
+      ]
+    },
+    {
+      title: "Data Pribadi",
+      fields: [
+        { label: "Tinggi badan", value: withUnit(extra.height_cm || candidate.height, "cm") },
+        { label: "Berat badan", value: withUnit(extra.weight_kg || candidate.weight, "kg") },
+        { label: "Golongan darah", value: extra.blood_type },
+        { label: "Status pernikahan", value: extra.marital_status },
+        { label: "Agama", value: extra.religion },
+        { label: "Status paspor", value: extra.passport_status },
+        { label: "Memakai kacamata", value: extra.wears_glasses },
+        { label: "Riwayat medis", value: candidate.medicalHistory },
+        { label: "File medical checkup", value: extra.medical_checkup_file }
+      ]
+    },
+    {
+      title: "Pendidikan",
+      fields: [
+        { label: "Pendidikan terakhir", value: candidate.education },
+        { label: "SD", value: describeSchool(extra.elementary_school_name, extra.elementary_start_date, extra.elementary_end_date) },
+        { label: "SMP", value: describeSchool(extra.junior_high_school_name, extra.junior_high_start_date, extra.junior_high_end_date) },
+        { label: "Nama SMA/SMK", value: extra.senior_high_school_name },
+        { label: "Jenis SMA/SMK", value: chooseOther(extra.senior_high_type, extra.senior_high_type_other) },
+        { label: "Jurusan SMA/SMK", value: chooseOther(extra.senior_high_major, extra.senior_high_major_other) },
+        { label: "Periode SMA/SMK", value: dateRange(extra.senior_high_start_date, extra.senior_high_end_date) },
+        { label: "Pernah kuliah", value: extra.university },
+        { label: "Nama universitas", value: extra.university_name },
+        { label: "Jenjang gelar", value: chooseOther(extra.degree_level, extra.degree_level_other) },
+        { label: "Jurusan universitas", value: chooseOther(extra.university_major, extra.university_major_other) },
+        { label: "Periode universitas", value: dateRange(extra.university_start_date, extra.university_end_date) }
+      ]
+    },
+    {
+      title: "Pengalaman Kerja",
+      fields: [
+        { label: "Pernah bekerja", value: extra.work_has_experience },
+        { label: "Ringkasan pengalaman", value: candidate.experience || extra.work_experience },
+        ...jobFields(extra, "job1", "Pekerjaan terakhir"),
+        ...jobFields(extra, "job2", "Pekerjaan sebelumnya 1"),
+        ...jobFields(extra, "job3", "Pekerjaan sebelumnya 2")
+      ]
+    },
+    {
+      title: "Keluarga",
+      fields: [
+        { label: "Catatan keluarga", value: extra.family_notes || candidate.family },
+        ...Array.from({ length: 6 }, (_, index) => familyFields(extra, index + 1)).flat()
+      ]
+    },
+    {
+      title: "Lifestyle & LPK",
+      fields: [
+        { label: "Minum alkohol", value: extra.drinks_alcohol },
+        { label: "Merokok", value: extra.smokes },
+        { label: "Memiliki tato", value: extra.has_tattoo },
+        { label: "Ringkasan lifestyle", value: extra.lifestyle || candidate.habits },
+        { label: "Asal LPK", value: chooseOther(extra.lpk_origin, extra.lpk_origin_other) || extra.lpk_information },
+        { label: "Jam belajar bahasa Jepang", value: withUnit(extra.japanese_study_hours, "jam") },
+        { label: "Skill", value: candidate.skills }
+      ]
+    },
+    {
+      title: "Dokumen",
+      fields: [
+        { label: "KTP", value: extra.document_KTP },
+        { label: "KK", value: extra.document_KK },
+        { label: "Ijazah", value: extra.document_Ijazah },
+        { label: "Paspor", value: extra.document_Paspor },
+        { label: "Medical Checkup", value: extra["document_Medical Checkup"] },
+        { label: "Foto Profil", value: extra["document_Foto Profil"] },
+        { label: "Video tes fisik", value: extra.physical_test_video },
+        { label: "File tambahan", value: splitPipe(extra.additional_files) }
+      ]
+    }
+  ];
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Form Data Kandidat</CardTitle>
-          <CardDescription>Simpan sebagai draft atau kirim final setelah data wajib lengkap.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <form className="space-y-6" onSubmit={form.handleSubmit((values) => save(values as CandidateFormValues, "complete"))}>
-            <FormSection title="Identitas">
-              <Field label="Nama" error={form.formState.errors.name?.message}><Input {...form.register("name")} /></Field>
-              <Field label="Tanggal lahir" error={form.formState.errors.birthDate?.message}><Input type="date" {...form.register("birthDate")} /></Field>
-              <Field label="Gender"><select className="h-10 rounded-md border bg-background px-3 text-sm" {...form.register("gender")}><option>Laki-laki</option><option>Perempuan</option></select></Field>
-              <Field label="Email" error={form.formState.errors.email?.message}><Input {...form.register("email")} /></Field>
-              <Field label="Telepon" error={form.formState.errors.phone?.message}><Input {...form.register("phone")} /></Field>
-            </FormSection>
-            <FormSection title="Fisik dan Alamat">
-              <Field label="Tinggi" error={form.formState.errors.height?.message}><Input type="number" {...form.register("height")} /></Field>
-              <Field label="Berat" error={form.formState.errors.weight?.message}><Input type="number" {...form.register("weight")} /></Field>
-              <Field label="Kota" error={form.formState.errors.city?.message}><Input {...form.register("city")} /></Field>
-              <Field label="Alamat" error={form.formState.errors.address?.message}><Textarea {...form.register("address")} /></Field>
-            </FormSection>
-            <FormSection title="Pendidikan, Pengalaman, dan Keluarga">
-              <Field label="Pendidikan" error={form.formState.errors.education?.message}><Input {...form.register("education")} /></Field>
-              <Field label="Pengalaman" error={form.formState.errors.experience?.message}><Textarea {...form.register("experience")} /></Field>
-              <Field label="Keluarga" error={form.formState.errors.family?.message}><Textarea {...form.register("family")} /></Field>
-            </FormSection>
-            <FormSection title="Kebiasaan, Skill, dan Medis">
-              <Field label="Kebiasaan"><Input placeholder="Pisahkan dengan koma" {...form.register("habitsText")} /></Field>
-              <Field label="Skill"><Input placeholder="Pisahkan dengan koma" {...form.register("skillsText")} /></Field>
-              <Field label="Riwayat medis" error={form.formState.errors.medicalHistory?.message}><Textarea {...form.register("medicalHistory")} /></Field>
-            </FormSection>
-            {additionalFieldSections.map((section) => (
-              <FormSection key={section.title} title={section.title}>
-                {section.fields.map((field) => (
-                  <AdditionalField key={field.name} field={field} register={form.register} />
-                ))}
-              </FormSection>
+    <div className="space-y-4 text-sm">
+      {sections.map((section) => (
+        <section key={section.title} className="rounded-md border">
+          <div className="border-b bg-muted/40 px-3 py-2 font-medium">{section.title}</div>
+          <div className="grid gap-0 md:grid-cols-2">
+            {section.fields.map((field) => (
+              <div key={`${section.title}-${field.label}`} className="border-b px-3 py-2 last:border-b-0 md:odd:border-r">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">{field.label}</div>
+                <div className="mt-1 break-words font-medium">{displayValue(field.value)}</div>
+              </div>
             ))}
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={form.handleSubmit((values) => save(values as CandidateFormValues, "draft"))}>
-                Simpan Draft
-              </Button>
-              <Button type="submit">
-                <ClipboardCheck className="h-4 w-4" /> Submit Final
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <aside className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Status Kandidat</CardTitle>
-            <CardDescription>{profileLabels[candidate.profileStatus]} - {candidate.completeness}% lengkap</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Progress value={candidate.completeness} />
-            <Checklist candidate={candidate} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>CV Kandidat</CardTitle>
-            <CardDescription>Status: {cvLabels[candidate.cvStatus]}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <CvBadge status={candidate.cvStatus} />
-            <Button className="w-full" onClick={() => triggerCvGeneration(candidate.id)}>
-              <FileText className="h-4 w-4" /> Generate CV
-            </Button>
-            {candidateFiles.length ? candidateFiles.map((file) => (
-              <Button key={file.id} className="w-full" variant="outline" asChild>
-                <a href={file.url}><Download className="h-4 w-4" /> {file.name}</a>
-              </Button>
-            )) : <p className="text-sm text-muted-foreground">Belum ada file CV terbaru.</p>}
-          </CardContent>
-        </Card>
-      </aside>
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
 
-function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
-      <div className="grid gap-4 md:grid-cols-2">{children}</div>
-    </section>
-  );
+function displayValue(value: DetailField["value"]) {
+  if (Array.isArray(value)) {
+    const list = value.map((item) => item.trim()).filter(Boolean);
+    return list.length ? list.join(", ") : "-";
+  }
+  const text = String(value ?? "").trim();
+  return text || "-";
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <label className="space-y-1.5 text-sm font-medium">
-      <span>{label}</span>
-      {children}
-      {error ? <span className="block text-xs font-normal text-destructive">{error}</span> : null}
-    </label>
-  );
+function withUnit(value: string | number | undefined, unit: string) {
+  const text = String(value ?? "").trim();
+  return text ? `${text} ${unit}` : "";
 }
 
-function AdditionalField({
-  field,
-  register
-}: {
-  field: AdditionalFieldConfig;
-  register: UseFormRegister<CandidateFormValues>;
-}) {
-  const fieldName = `additionalFields.${field.name}` as const;
+function splitPipe(value: string | undefined) {
+  return String(value ?? "").split("|").map((item) => item.trim()).filter(Boolean);
+}
 
-  return (
-    <Field label={field.label}>
-      {field.type === "select" ? (
-        <select className="h-10 rounded-md border bg-background px-3 text-sm" {...register(fieldName)}>
-          <option value="">Pilih {field.label.toLowerCase()}</option>
-          {field.options?.map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-      ) : (
-        <Input
-          type={field.type === "date" || field.type === "number" ? field.type : "text"}
-          placeholder={field.type ? undefined : `Isi ${field.label.toLowerCase()}`}
-          {...register(fieldName)}
-        />
-      )}
-    </Field>
-  );
+function dateRange(start: string | undefined, end: string | undefined) {
+  const from = String(start ?? "").trim();
+  const to = String(end ?? "").trim();
+  if (!from && !to) return "";
+  return `${from || "-"} - ${to || "-"}`;
+}
+
+function chooseOther(value: string | undefined, other: string | undefined) {
+  return value === "Lainnya" ? other : value;
+}
+
+function describeSchool(name: string | undefined, start: string | undefined, end: string | undefined) {
+  const schoolName = String(name ?? "").trim();
+  const period = dateRange(start, end);
+  if (!schoolName) return period;
+  return period ? `${schoolName} (${period})` : schoolName;
+}
+
+function jobFields(extra: Candidate["additionalFields"], prefix: "job1" | "job2" | "job3", title: string): DetailField[] {
+  const fields = extra ?? {};
+  return [
+    { label: `${title} - nama pekerjaan`, value: fields[`${prefix}_title`] },
+    { label: `${title} - perusahaan`, value: fields[`${prefix}_company`] },
+    { label: `${title} - posisi`, value: chooseOther(fields[`${prefix}_role`], fields[`${prefix}_role_other`]) },
+    { label: `${title} - periode`, value: dateRange(fields[`${prefix}_start_date`], fields[`${prefix}_end_date`]) }
+  ];
+}
+
+function familyFields(extra: Candidate["additionalFields"], index: number): DetailField[] {
+  const fields = extra ?? {};
+  const prefix = `family${index}`;
+  return [
+    { label: `Keluarga ${index} - nama`, value: fields[`${prefix}_name`] },
+    { label: `Keluarga ${index} - tanggal lahir`, value: fields[`${prefix}_birth_date`] },
+    { label: `Keluarga ${index} - usia`, value: fields[`${prefix}_age`] },
+    { label: `Keluarga ${index} - hubungan`, value: chooseOther(fields[`${prefix}_relation`], fields[`${prefix}_relation_other`]) },
+    { label: `Keluarga ${index} - pekerjaan`, value: chooseOther(fields[`${prefix}_occupation`], fields[`${prefix}_occupation_other`]) }
+  ];
 }
 
 function Checklist({ candidate }: { candidate: Candidate }) {
@@ -981,55 +919,6 @@ function buildStats(candidates: Candidate[]) {
     cvDone: candidates.filter((candidate) => candidate.cvStatus === "done").length,
     needsAction: candidates.filter((candidate) => candidate.cvStatus === "failed" || candidate.cvStatus === "stale" || candidate.profileStatus !== "complete").length
   };
-}
-
-function toFormValues(candidate: Candidate): CandidateFormValues {
-  return {
-    name: candidate.name,
-    birthDate: candidate.birthDate,
-    gender: candidate.gender,
-    height: candidate.height,
-    weight: candidate.weight,
-    address: candidate.address,
-    city: candidate.city,
-    education: candidate.education,
-    experience: candidate.experience,
-    family: candidate.family,
-    habitsText: candidate.habits.join(", "),
-    skillsText: candidate.skills.join(", "),
-    medicalHistory: candidate.medicalHistory,
-    phone: candidate.phone,
-    email: candidate.email,
-    additionalFields: buildAdditionalFieldDefaults(candidate)
-  };
-}
-
-function fromFormValues(candidate: Candidate, values: CandidateFormValues, profileStatus: ProfileStatus): Partial<Candidate> {
-  const { habitsText, skillsText, additionalFields, ...baseValues } = values;
-
-  return {
-    ...baseValues,
-    habits: splitCsv(habitsText),
-    skills: splitCsv(skillsText),
-    additionalFields: Object.fromEntries(Object.entries(additionalFields).map(([key, value]) => [key, String(value)])),
-    profileStatus,
-    completeness: profileStatus === "complete" ? 100 : Math.max(45, candidate.completeness),
-    cvStatus: "stale" as CvStatus
-  };
-}
-
-function buildAdditionalFieldDefaults(candidate: Candidate) {
-  const savedFields = candidate.additionalFields ?? {};
-  return additionalFieldSections.reduce<Record<string, string>>((acc, section) => {
-    section.fields.forEach((field) => {
-      acc[field.name] = savedFields[field.name] ?? "";
-    });
-    return acc;
-  }, {});
-}
-
-function splitCsv(value: string) {
-  return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
 function unique(values: string[]) {

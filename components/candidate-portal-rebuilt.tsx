@@ -168,7 +168,10 @@ export function CandidatePortalRebuilt({
   candidates: backendCandidates,
   files: backendFiles,
   useBackend = false,
-  onRefresh
+  onRefresh,
+  onCancel,
+  onSaved,
+  variant = "page"
 }: {
   candidateId: number;
   candidate?: Candidate;
@@ -176,6 +179,9 @@ export function CandidatePortalRebuilt({
   files?: CandidateFile[];
   useBackend?: boolean;
   onRefresh?: () => Promise<void>;
+  onCancel?: () => void;
+  onSaved?: () => void;
+  variant?: "page" | "embedded";
 }) {
   const storeCandidates = useCrmStore((state) => state.candidates);
   const storeFiles = useCrmStore((state) => state.files);
@@ -231,6 +237,7 @@ export function CandidatePortalRebuilt({
       updateCandidate(updated, profileStatus === "complete" ? "final_submit_candidate" : "save_draft_candidate");
     }
     setMessage(profileStatus === "complete" ? "Data final tersimpan." : "Draft tersimpan.");
+    onSaved?.();
   }
 
   async function handleGenerateCv() {
@@ -242,12 +249,23 @@ export function CandidatePortalRebuilt({
     triggerCvGeneration(candidate.id);
   }
 
+  const isEmbedded = variant === "embedded";
+
   return (
-    <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-6">
+    <div className={cn(isEmbedded ? "grid gap-4" : "mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-6")}>
       <Card>
         <CardHeader>
-          <CardTitle>Form Data Kandidat</CardTitle>
-          <CardDescription>Isi data kandidat per bagian. Draft bisa disimpan kapan saja, submit final memakai validasi key field.</CardDescription>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Form Data Kandidat</CardTitle>
+              <CardDescription>Isi data kandidat per bagian. Draft bisa disimpan kapan saja, submit final memakai validasi key field.</CardDescription>
+            </div>
+            {onCancel ? (
+              <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+                Batal
+              </Button>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
@@ -286,11 +304,17 @@ export function CandidatePortalRebuilt({
               <Button type="button" onClick={() => void save("complete")}>
                 <CheckCircle2 className="h-4 w-4" /> Submit Final
               </Button>
+              {onCancel ? (
+                <Button type="button" variant="ghost" onClick={onCancel}>
+                  Batal
+                </Button>
+              ) : null}
             </div>
           </form>
         </CardContent>
       </Card>
 
+      {!isEmbedded ? (
       <aside className="space-y-6">
         <Card>
           <CardHeader>
@@ -329,6 +353,7 @@ export function CandidatePortalRebuilt({
           </CardContent>
         </Card>
       </aside>
+      ) : null}
     </div>
   );
 }
